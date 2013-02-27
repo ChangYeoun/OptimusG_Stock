@@ -130,22 +130,8 @@
 #define SENSOR_MAX_Y_POS                                (ts->finger_fc.dsc.control_base+8)                /* SensorMaxYPos */
 
 /* CAPACITIVE_BUTTON_SENSORS */
-<<<<<<< HEAD
-#define BUTTON_COMMAND_REG				(ts->button_fc.dsc.command_base)
-#define BUTTON_DATA_REG					(ts->button_fc.dsc.data_base)			/* Button Data */
-
-#ifdef CONFIG_MACH_APQ8064_GK_KR
-#define BUTTON_CONTROL_REG				(ts->button_fc.dsc.control_base)
-#define BUTTON_PRESS_THRESHOLD			0x50
-#define BUTTON_RELEASE_THRESHOLD		0xCD
-#define BUTTON_PRESS_THRESH_REG_0	(BUTTON_CONTROL_REG+11)
-#define BUTTON_PRESS_THRESH_REG_1	(BUTTON_CONTROL_REG+12)
-#define BUTTON_RELEASE_THRESH_REG	(BUTTON_CONTROL_REG+15)
-#endif
-=======
 #define BUTTON_COMMAND_REG                                (ts->button_fc.dsc.command_base)
 #define BUTTON_DATA_REG                                        (ts->button_fc.dsc.data_base)                        /* Button Data */
->>>>>>> e74eadf... hotplug add Franco
 
 #define MAX_NUM_OF_BUTTON                                4
 
@@ -637,115 +623,6 @@ int get_ic_info(struct synaptics_ts_data* ts, struct touch_fw_info* fw_info)
         int cnt;
 #endif
 
-<<<<<<< HEAD
-	u8 device_status = 0;
-	u8 flash_control = 0;
-
-	read_page_description_table(ts->client);
-
-	memset(&ts->fw_info, 0, sizeof(struct synaptics_ts_fw_info));
-
-	if (unlikely(touch_i2c_read(ts->client, FW_REVISION_REG,
-			sizeof(ts->fw_info.fw_rev), &ts->fw_info.fw_rev) < 0)) {
-		TOUCH_ERR_MSG("FW_REVISION_REG read fail\n");
-		return -EIO;
-	}
-
-	if (unlikely(touch_i2c_read(ts->client, MANUFACTURER_ID_REG,
-			sizeof(ts->fw_info.manufacturer_id), &ts->fw_info.manufacturer_id) < 0)) {
-		TOUCH_ERR_MSG("MANUFACTURER_ID_REG read fail\n");
-		return -EIO;
-	}
-
-	/* Product ID - G:TM2000, GJ:TM2372, GK:PLG124(LGIT G1F), PLG192(SUNTEL GFF) , PLG193(LGIT GFF), PLG207(LGIT GFF HYBRID), GV:PLG121(LGIT), PLG184(TPK) */
-	if (unlikely(touch_i2c_read(ts->client, PRODUCT_ID_REG,
-			sizeof(ts->fw_info.product_id) - 1, ts->fw_info.product_id) < 0)) {
-		TOUCH_ERR_MSG("PRODUCT_ID_REG read fail\n");
-		return -EIO;
-	}
-
-	if (unlikely(touch_i2c_read(ts->client, FLASH_CONFIG_ID_REG,
-			sizeof(ts->fw_info.config_id) - 1, ts->fw_info.config_id) < 0)) {
-		TOUCH_ERR_MSG("FLASH_CONFIG_ID_REG read fail\n");
-		return -EIO;
-	}
-
-	snprintf(fw_info->ic_fw_identifier, sizeof(fw_info->ic_fw_identifier),
-			"%s - %d", ts->fw_info.product_id, ts->fw_info.manufacturer_id);
-	snprintf(fw_info->ic_fw_version, sizeof(fw_info->ic_fw_version),
-			"%s", ts->fw_info.config_id);
-	
-#ifdef CUST_G_TOUCH
-	if(!strncmp(ts->fw_info.product_id, "DS4 R3.0", 8)) {	//G OLD PANEL
-		if(!strncmp(fw_info->ic_fw_version, "0000", 4) || !strncmp(fw_info->ic_fw_version, "S001", 4)) {
-			ts->ic_panel_type = G_IC7020_GFF;
-			TOUCH_INFO_MSG("IC is 7020, panel is GFF.");
-		} else {
-			if( fw_info->ic_fw_version[0] == 'E' && (int)simple_strtol(&fw_info->ic_fw_version[1], NULL, 10) < 14) {
-				ts->ic_panel_type = G_IC7020_G2;
-				TOUCH_INFO_MSG("IC is 7020, panel is G2.");
-			} else if( (fw_info->ic_fw_version[0] == 'E' && 
-				  	   (int)simple_strtol(&fw_info->ic_fw_version[1], NULL, 10) >= 14 && 
-				       (int)simple_strtol(&fw_info->ic_fw_version[1], NULL, 10) < 27) || 
-				       fw_info->ic_fw_version[0] == 'T') {
-				ts->ic_panel_type = G_IC3203_G2;
-				TOUCH_INFO_MSG("IC is 3203, panel is G2.");
-			} else {
-				ts->ic_panel_type = UNKNOWN;
-				TOUCH_INFO_MSG("UNKNOWN OLD PANEL");
-			}
-		}
-	} else if(!strncmp(ts->fw_info.product_id, "TM2000", 6)) {	//G PANEL LGIT
-		ts->ic_panel_type = G_IC7020_G2_LGIT;
-		TOUCH_INFO_MSG("IC is 7020, H pattern, panel is G2. LGIT");
-
-		if((fw_info->ic_fw_version[0] == 'E') && 
-		   ((int)simple_strtol(&fw_info->ic_fw_version[1], NULL, 10) >= 40)) {
-			ts->interrupt_mask.button = 0x10;
-		}
-	} else if(!strncmp(ts->fw_info.product_id, "TM2369", 6)) {	//G PANEL TPK
-		ts->ic_panel_type = G_IC7020_G2_TPK;
-		TOUCH_INFO_MSG("IC is 7020, H pattern, panel is G2. TPK");
-		ts->interrupt_mask.button = 0x10;
-	} else if(!strncmp(ts->fw_info.product_id, "TM2372", 6)) {	//GJ PANEL
-		ts->ic_panel_type = GJ_IC7020_GFF_H_PTN;
-		TOUCH_INFO_MSG("IC is 7020, H pattern, panel is GFF.");
-
-		if((fw_info->ic_fw_version[0] == 'E') &&
-		   ((int)simple_strtol(&fw_info->ic_fw_version[1], NULL, 10) >= 2)) {
-			ts->interrupt_mask.button = 0x10;
-		}
-	} else if(!strncmp(ts->fw_info.product_id, "PLG124", 6)) {	//GK PANEL LGIT G1F
-		ts->ic_panel_type = GK_IC7020_G1F;
-		TOUCH_INFO_MSG("IC is 7020, H pattern, panel is G1F.");
-		ts->interrupt_mask.button = 0x10;
-	} else if(!strncmp(ts->fw_info.product_id, "PLG192", 6)) {	//GK PANEL SUNTEL GFF
-		ts->ic_panel_type = GK_IC7020_GFF_SUNTEL;
-		TOUCH_INFO_MSG("IC is 7020, H pattern, panel is GFF. SUNTEL");
-		ts->interrupt_mask.button = 0x10;
-	} else if(!strncmp(ts->fw_info.product_id, "PLG193", 6)) {	//GK PANEL LGIT GFF
-		ts->ic_panel_type = GK_IC7020_GFF_LGIT;
-		TOUCH_INFO_MSG("IC is 7020, H pattern, panel is GFF. LGIT");
-		ts->interrupt_mask.button = 0x10;
-	} else if(!strncmp(ts->fw_info.product_id, "PLG207", 6)) {	//GK PANEL LGIT GFF HYBRID
-		ts->ic_panel_type = GK_IC7020_GFF_LGIT_HYBRID;
-		TOUCH_INFO_MSG("IC is 7020, H pattern, panel is GFF. LGIT");
-		ts->interrupt_mask.button = 0x10;
-	} else if(!strncmp(ts->fw_info.product_id, "PLG121", 6)) {	//GV PANEL
-		ts->ic_panel_type = GV_IC7020_G2_H_PTN_LGIT;
-		TOUCH_INFO_MSG("IC is 7020, H pattern, panel is G2. LGIT");
-		ts->interrupt_mask.button = 0x10;
-	} else if(!strncmp(ts->fw_info.product_id, "PLG184", 6)) {	//GV PANEL TPK
-		ts->ic_panel_type = GV_IC7020_G2_H_PTN_TPK;
-		TOUCH_INFO_MSG("IC is 7020, H pattern, panel is G2. TPK");
-		ts->interrupt_mask.button = 0x10;
-	} else if(!strncmp(ts->fw_info.product_id, "S7020", 5)) {	//S7020 PANEL (UNKNOWN PANEL)
-		TOUCH_INFO_MSG("UNKNOWN PANEL, Product id is S7020.");
-		ts->interrupt_mask.button = 0x10;
-	} else {
-		TOUCH_INFO_MSG("UNKNOWN PANEL");
-	}
-=======
         u8 device_status = 0;
         u8 flash_control = 0;
 
@@ -853,7 +730,6 @@ int get_ic_info(struct synaptics_ts_data* ts, struct touch_fw_info* fw_info)
         } else {
                 TOUCH_INFO_MSG("UNKNOWN PANEL");
         }
->>>>>>> e74eadf... hotplug add Franco
 #endif
 
 
@@ -884,26 +760,6 @@ int get_ic_info(struct synaptics_ts_data* ts, struct touch_fw_info* fw_info)
                         }
 #endif
 
-<<<<<<< HEAD
-#if defined(CONFIG_MACH_APQ8064_GK_KR) || defined(CONFIG_MACH_APQ8064_GKATT)
-	switch(ts->ic_panel_type){
-		case GK_IC7020_G1F:
-			memcpy(&SynaFirmware[0], &SynaFirmware_PLG124[0], sizeof(SynaFirmware));
-			break;
-		case GK_IC7020_GFF_SUNTEL:
-			memcpy(&SynaFirmware[0], &SynaFirmware_PLG192[0], sizeof(SynaFirmware));
-			break;
-		case GK_IC7020_GFF_LGIT:
-			memcpy(&SynaFirmware[0], &SynaFirmware_PLG193[0], sizeof(SynaFirmware));
-			break;
-		case GK_IC7020_GFF_LGIT_HYBRID:
-			memcpy(&SynaFirmware[0], &SynaFirmware_PLG207[0], sizeof(SynaFirmware));
-			break;
-		default:
-			TOUCH_ERR_MSG("UNKNOWN PANEL(GK). SynaImage set error");
-			break;
-	}
-=======
 #if defined(CONFIG_MACH_APQ8064_GK_KR) || defined(CONFIG_MACH_APQ8064_GKATT) || defined(CONFIG_MACH_APQ8064_GKGLOBAL)
         switch(ts->ic_panel_type){
                 case GK_IC7020_G1F:
@@ -922,7 +778,6 @@ int get_ic_info(struct synaptics_ts_data* ts, struct touch_fw_info* fw_info)
                         TOUCH_ERR_MSG("UNKNOWN PANEL(GK). SynaImage set error");
                         break;
         }
->>>>>>> e74eadf... hotplug add Franco
 #elif defined(CONFIG_MACH_APQ8064_GVDCM)
         switch(ts->ic_panel_type){
                 case GV_IC7020_G2_H_PTN_LGIT:
