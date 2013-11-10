@@ -36,6 +36,7 @@
 #include "kgsl_sharedmem.h"
 #include "kgsl_device.h"
 #include "kgsl_trace.h"
+#include "kgsl_sync.h"
 
 #undef MODULE_PARAM_PREFIX
 #define MODULE_PARAM_PREFIX "kgsl."
@@ -368,6 +369,12 @@ kgsl_create_context(struct kgsl_device_private *dev_priv)
 	context->id = id;
 	context->dev_priv = dev_priv;
 
+	if (kgsl_sync_timeline_create(context)) {
+		idr_remove(&dev_priv->device->context_idr, id);
+		kfree(context);
+		return NULL;
+	}
+
 	return context;
 }
 
@@ -412,6 +419,7 @@ kgsl_context_destroy(struct kref *kref)
 {
 	struct kgsl_context *context = container_of(kref, struct kgsl_context,
 						    refcount);
+	kgsl_sync_timeline_destroy(context);
 	kfree(context);
 }
 
@@ -441,6 +449,22 @@ void kgsl_timestamp_expired(struct work_struct *work)
 		kfree(event);
 	}
 
+	/* Send the next pending event for each context to the device */
+	if (device->ftbl->next_event) {
+		unsigned int id = KGSL_MEMSTORE_GLOBAL;
+
+		list_for_each_entry(event, &device->events, list) {
+
+			if (!event->context)
+				continue;
+
+			if (event->context->id != id) {
+				device->ftbl->next_event(device, event);
+				id = event->context->id;
+			}
+		}
+	}
+
 	mutex_unlock(&device->mutex);
 }
 EXPORT_SYMBOL(kgsl_timestamp_expired);
@@ -451,7 +475,7 @@ static void kgsl_check_idle_locked(struct kgsl_device *device)
 	    device->state == KGSL_STATE_ACTIVE &&
 		device->requested_state == KGSL_STATE_NONE) {
 		kgsl_pwrctrl_request_state(device, KGSL_STATE_NAP);
-		kgsl_pwrscale_idle(device, 1);
+		kgsl_pwrscale_idle(device);
 		if (kgsl_pwrctrl_sleep(device) != 0)
 			mod_timer(&device->idle_timer,
 				  jiffies +
@@ -498,24 +522,6 @@ static struct kgsl_device *kgsl_get_minor(int minor)
 
 	return ret;
 }
-
-int kgsl_register_ts_notifier(struct kgsl_device *device,
-			      struct notifier_block *nb)
-{
-	BUG_ON(device == NULL);
-	return atomic_notifier_chain_register(&device->ts_notifier_list,
-					      nb);
-}
-EXPORT_SYMBOL(kgsl_register_ts_notifier);
-
-int kgsl_unregister_ts_notifier(struct kgsl_device *device,
-				struct notifier_block *nb)
-{
-	BUG_ON(device == NULL);
-	return atomic_notifier_chain_unregister(&device->ts_notifier_list,
-						nb);
-}
-EXPORT_SYMBOL(kgsl_unregister_ts_notifier);
 
 int kgsl_check_timestamp(struct kgsl_device *device,
 	struct kgsl_context *context, unsigned int timestamp)
@@ -2100,6 +2106,11 @@ static long kgsl_ioctl_timestamp_event(struct kgsl_device_private *dev_priv,
 			param->context_id, param->timestamp, param->priv,
 			param->len, dev_priv);
 		break;
+	case KGSL_TIMESTAMP_EVENT_FENCE:
+		ret = kgsl_add_fence_event(dev_priv->device,
+			param->context_id, param->timestamp, param->priv,
+			param->len, dev_priv);
+		break;
 	default:
 		ret = -EINVAL;
 	}
@@ -2178,6 +2189,8 @@ static long kgsl_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 		cmd = IOCTL_KGSL_CMDSTREAM_FREEMEMONTIMESTAMP;
 	else if (cmd == IOCTL_KGSL_CMDSTREAM_READTIMESTAMP_OLD)
 		cmd = IOCTL_KGSL_CMDSTREAM_READTIMESTAMP;
+	else if (cmd == IOCTL_KGSL_TIMESTAMP_EVENT_OLD)
+		cmd = IOCTL_KGSL_TIMESTAMP_EVENT;
 
 	nr = _IOC_NR(cmd);
 
