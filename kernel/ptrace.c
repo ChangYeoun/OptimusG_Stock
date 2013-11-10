@@ -218,7 +218,6 @@ int ptrace_check_attach(struct task_struct *child, bool ignore_state)
 	read_unlock(&tasklist_lock);
 
 	if (!ret && !ignore_state) {
-<<<<<<< HEAD
       if (!wait_task_inactive(child, __TASK_TRACED)) {
         /*
          * This can only happen if may_ptrace_stop() fails and
@@ -229,18 +228,6 @@ int ptrace_check_attach(struct task_struct *child, bool ignore_state)
         ret = -ESRCH;
       }
     }
-=======
-		if (!wait_task_inactive(child, __TASK_TRACED)) {
-			/*
-			 * This can only happen if may_ptrace_stop() fails and
-			 * ptrace_stop() changes ->state back to TASK_RUNNING,
-			 * so we should not worry about leaking __TASK_TRACED.
-			 */
-			WARN_ON(child->state == __TASK_TRACED);
-			ret = -ESRCH;
-		}
-	}
->>>>>>> ccd7576... ptrace: ensure arch_ptrace/ptrace_request can never race with SIGKILL
 
 	return ret;
 }
@@ -975,13 +962,8 @@ SYSCALL_DEFINE4(ptrace, long, request, long, pid, unsigned long, addr,
 
 	ret = arch_ptrace(child, request, addr, data);
 	if (ret || request != PTRACE_DETACH)
-<<<<<<< HEAD
 	  ptrace_unfreeze_traced(child);
 	  
-=======
-		ptrace_unfreeze_traced(child);
-
->>>>>>> ccd7576... ptrace: ensure arch_ptrace/ptrace_request can never race with SIGKILL
  out_put_task_struct:
 	put_task_struct(child);
  out:
@@ -1133,11 +1115,7 @@ asmlinkage long compat_sys_ptrace(compat_long_t request, compat_long_t pid,
 	if (!ret) {
 		ret = compat_arch_ptrace(child, request, addr, data);
 		if (ret || request != PTRACE_DETACH)
-<<<<<<< HEAD
 		  ptrace_unfreeze_traced(child);
-=======
-			ptrace_unfreeze_traced(child);
->>>>>>> ccd7576... ptrace: ensure arch_ptrace/ptrace_request can never race with SIGKILL
 	}
 
  out_put_task_struct:
